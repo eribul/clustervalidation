@@ -1,10 +1,14 @@
-
 set.seed(123)
 
 library(mvtnorm)
 library(tidyverse)
 library(NbClust)
 library(gridExtra)
+library(animation)
+
+indices <- c(
+  "kl", "ch", "ccc", "marriot", "tracew", "rubin", "cindex", "db", "silhouette", "duda", "beale", "ratkowsky", "ptbiserial", "mcclain", "dunn", "sdindex", "sdbw"
+)
 
 # Random data -------------------------------------------------------------
 
@@ -13,7 +17,7 @@ xy_cords <- function() c(sample.int(20, 1), sample.int(20, 1))
 
 # Gaussion dist data centered around given coordinates
 rdata <- function(center = xy_cords(), n = 100) {
-  data <- rmvnorm(n, mean = center, ...)
+  data <- rmvnorm(n, mean = center)
   data %>%
     as_tibble() %>%
     rename(x = V1, y = V2)
@@ -22,21 +26,14 @@ rdata <- function(center = xy_cords(), n = 100) {
 # Data set with n random clusters
 rdata_n <- function(n) {
   tibble(class = factor(seq_len(n))) %>%
-  mutate(data = map(class, ~ generateGaussianData())) %>%
+  mutate(data  = map(class, ~rdata())) %>%
   unnest(data)
 }
 
 
 # Optimal number of clusters ----------------------------------------------
 
-optim_nclust <- function(data) {
-
-  nb <-
-    NbClust(
-      as.matrix(select(data, -class)),
-      method = "kmeans",
-      index = "all"
-    )
+optim_nclust <- function(data, nb) {
 
   winners <-
     nb$Best.nc %>%
@@ -54,29 +51,26 @@ optim_nclust <- function(data) {
       index = tolower(index)
     )
 
-  all <-
-    bind_rows(
-      all = all, winners = winners, .id = "type"
-    ) %>%
-    filter(index != "frey")
+  all <- bind_rows(all = all, winners = winners, .id = "type") %>%
+    filter(index %in% indices)
 
   # Plot original data
   p_orig <-
     data %>%
     ggplot(aes(x, y, color = class)) +
     geom_point() +
-    coord_fixed() +
-    theme_light() +
+    coord_fixed(xlim = c(0, 22), ylim = c(0, 22)) +
+    theme_minimal() +
     theme(legend.position = "none") +
     ggtitle("Simulated data")
 
   p_best <-
     data %>%
-    mutate(class = nb$Best.partition) %>%
+    mutate(class = as.factor(nb$Best.partition)) %>%
     ggplot(aes(x, y, color = class)) +
     geom_point() +
-    coord_fixed() +
-    theme_light() +
+    coord_fixed(xlim = c(0, 22), ylim = c(0, 22)) +
+    theme_minimal() +
     theme(legend.position = "none") +
     ggtitle("Clustered data")
 
@@ -87,12 +81,13 @@ optim_nclust <- function(data) {
       geom_line() +
       geom_point(color = "red", data = filter(all, type == "winners")) +
       facet_wrap(~ index, scales = "free_y") +
-      theme_light() +
+      theme_minimal() +
       ggtitle(sprintf(
         "Actual = %d clusters, found = %d",
         length(levels(data$class)),
         max(nb$Best.partition))
-      )
+      ) +
+      labs(x = "number of clusters", y = "index value")
 
   gridExtra::grid.arrange(
     arrangeGrob(p_orig, p_best, ncol = 1),
@@ -107,10 +102,13 @@ optim_nclust <- function(data) {
 
 find_n_clust <-
   tibble(n = 1:15) %>%
-    mutate(
-      data = map(n, rdata_n),
-      gg   = map(data, optim_nclust)
-    )
+  mutate(
+    data = map(n, rdata_n),
+    datam = map(data, ~as.matrix(select(., -class))),
+    nb   = map(datam, NbClust, method = "kmeans", index = "all"),
+    gg   = map2(data, nb, optim_nclust)
+  )
+saveRDS(find_n_clust, "find_n_clust.rds")
 
 # Save
 walk2(

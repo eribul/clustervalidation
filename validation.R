@@ -4,10 +4,11 @@ library(mvtnorm)
 library(tidyverse)
 library(NbClust)
 library(gridExtra)
-library(animation)
 
 indices <- c(
-  "kl", "ch", "ccc", "marriot", "tracew", "rubin", "cindex", "db", "silhouette", "duda", "beale", "ratkowsky", "ptbiserial", "mcclain", "dunn", "sdindex", "sdbw"
+  "kl", "ch", "ccc", "marriot", "tracew", "rubin", "cindex", "db",
+  "silhouette", "duda", "beale", "ratkowsky", "ptbiserial", "mcclain",
+  "dunn", "sdindex", "sdbw"
 )
 
 # Random data -------------------------------------------------------------
